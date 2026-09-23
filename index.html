@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ipynb → PDF</title>
+<meta name="description" content="Convert Jupyter Notebook (.ipynb) files to PDF entirely in your browser. No upload, no server." />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <h1>ipynb → PDF</h1>
+      <p class="subtitle">Convert Jupyter notebooks to PDF, right in your browser. Nothing is uploaded anywhere.</p>
+    </header>
+
+    <div id="dropzone" class="dropzone">
+      <input type="file" id="fileInput" accept=".ipynb" hidden />
+      <div class="dropzone-content">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <p><strong>Drop a .ipynb file here</strong> or click to browse</p>
+        <p class="hint">Your file stays on this device — nothing is sent to a server.</p>
+      </div>
+    </div>
+
+    <div id="toolbar" class="toolbar hidden">
+      <div class="file-info">
+        <span id="fileName"></span>
+      </div>
+      <div class="toolbar-actions">
+        <button id="downloadPdfBtn" class="btn btn-primary">Download PDF</button>
+        <button id="resetBtn" class="btn btn-secondary">Choose another file</button>
+      </div>
+    </div>
+
+    <div id="status" class="status hidden"></div>
+
+    <div id="preview" class="preview hidden">
+      <div id="notebookRoot" class="notebook"></div>
+    </div>
+
+    <footer class="app-footer">
+      <p>Runs 100% client-side — your notebook never leaves your browser. <a href="https://github.com" target="_blank" rel="noopener">Open source</a>.</p>
+    </footer>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
