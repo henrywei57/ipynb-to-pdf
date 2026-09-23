@@ -4,14 +4,18 @@
   const dropzone = document.getElementById("dropzone");
   const fileInput = document.getElementById("fileInput");
   const toolbar = document.getElementById("toolbar");
-  const fileNameEl = document.getElementById("fileName");
+  const fileCountEl = document.getElementById("fileCount");
+  const fileListEl = document.getElementById("fileList");
   const downloadBtn = document.getElementById("downloadPdfBtn");
+  const addMoreBtn = document.getElementById("addMoreBtn");
   const resetBtn = document.getElementById("resetBtn");
   const statusEl = document.getElementById("status");
   const previewEl = document.getElementById("preview");
   const notebookRoot = document.getElementById("notebookRoot");
 
-  let currentBaseName = "notebook";
+  // Each entry: { id, fileName, baseName, notebook }
+  let loadedFiles = [];
+  let nextId = 1;
 
   marked.setOptions({
     breaks: true,
@@ -27,13 +31,6 @@
     },
   });
 
-  function escapeHtml(str) {
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
   function joinSource(source) {
     if (Array.isArray(source)) return source.join("");
     return source || "";
@@ -46,6 +43,10 @@
       (meta.kernelspec && meta.kernelspec.language) ||
       "python"
     );
+  }
+
+  function stripAnsi(str) {
+    return str.replace(/\[[0-9;]*m/g, "");
   }
 
   function renderOutput(output) {
@@ -103,10 +104,6 @@
     return null;
   }
 
-  function stripAnsi(str) {
-    return str.replace(/\[[0-9;]*m/g, "");
-  }
-
   function renderCodeCell(cell, language) {
     const container = document.createElement("div");
     container.className = "nb-cell nb-cell-code";
@@ -160,16 +157,18 @@
     return container;
   }
 
-  function renderNotebook(notebook, title) {
-    notebookRoot.innerHTML = "";
+  function buildNotebookElement(entry) {
+    const doc = document.createElement("div");
+    doc.className = "nb-doc";
+    doc.dataset.fileId = entry.id;
 
     const titleEl = document.createElement("div");
     titleEl.className = "nb-title";
-    titleEl.textContent = title;
-    notebookRoot.appendChild(titleEl);
+    titleEl.textContent = entry.baseName;
+    doc.appendChild(titleEl);
 
-    const language = detectLanguage(notebook);
-    const cells = notebook.cells || [];
+    const language = detectLanguage(entry.notebook);
+    const cells = entry.notebook.cells || [];
 
     cells.forEach((cell) => {
       let el;
@@ -180,8 +179,55 @@
       } else {
         el = renderRawCell(cell);
       }
-      notebookRoot.appendChild(el);
+      doc.appendChild(el);
     });
+
+    return doc;
+  }
+
+  function renderAll() {
+    notebookRoot.innerHTML = "";
+    loadedFiles.forEach((entry) => {
+      notebookRoot.appendChild(buildNotebookElement(entry));
+    });
+  }
+
+  function renderFileList() {
+    fileListEl.innerHTML = "";
+    loadedFiles.forEach((entry) => {
+      const li = document.createElement("li");
+      const name = document.createElement("span");
+      name.className = "file-list-name";
+      name.textContent = entry.fileName;
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "file-remove";
+      removeBtn.type = "button";
+      removeBtn.setAttribute("aria-label", `Remove ${entry.fileName}`);
+      removeBtn.textContent = "✕";
+      removeBtn.addEventListener("click", () => removeFile(entry.id));
+      li.appendChild(name);
+      li.appendChild(removeBtn);
+      fileListEl.appendChild(li);
+    });
+  }
+
+  function updateUiForFiles() {
+    const hasFiles = loadedFiles.length > 0;
+    toolbar.classList.toggle("hidden", !hasFiles);
+    fileListEl.classList.toggle("hidden", !hasFiles);
+    previewEl.classList.toggle("hidden", !hasFiles);
+    dropzone.classList.toggle("hidden", hasFiles);
+    fileCountEl.textContent = hasFiles
+      ? `${loadedFiles.length} notebook${loadedFiles.length === 1 ? "" : "s"} loaded`
+      : "";
+    renderFileList();
+    renderAll();
+  }
+
+  function removeFile(id) {
+    loadedFiles = loadedFiles.filter((entry) => entry.id !== id);
+    updateUiForFiles();
+    if (loadedFiles.length === 0) hideStatus();
   }
 
   function showStatus(message, type) {
@@ -194,50 +240,85 @@
     statusEl.classList.add("hidden");
   }
 
-  function handleFile(file) {
-    if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".ipynb")) {
-      showStatus("Please choose a valid .ipynb file.", "error");
+  function uniqueBaseName(name) {
+    let candidate = name;
+    let n = 2;
+    const existing = new Set(loadedFiles.map((e) => e.baseName));
+    while (existing.has(candidate)) {
+      candidate = `${name} (${n})`;
+      n += 1;
+    }
+    return candidate;
+  }
+
+  function readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error("Could not read file"));
+      reader.readAsText(file);
+    });
+  }
+
+  async function handleFiles(fileListLike) {
+    const files = Array.from(fileListLike || []).filter((f) =>
+      f.name.toLowerCase().endsWith(".ipynb")
+    );
+
+    if (files.length === 0) {
+      showStatus("Please choose one or more valid .ipynb files.", "error");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
+    const errors = [];
+
+    for (const file of files) {
+      let text;
+      try {
+        text = await readFileAsText(file);
+      } catch (e) {
+        errors.push(`${file.name}: could not be read`);
+        continue;
+      }
+
       let notebook;
       try {
-        notebook = JSON.parse(reader.result);
+        notebook = JSON.parse(text);
       } catch (e) {
-        showStatus("This file isn't valid JSON — is it really a .ipynb notebook?", "error");
-        return;
+        errors.push(`${file.name}: not valid JSON`);
+        continue;
       }
 
       if (!notebook || !Array.isArray(notebook.cells)) {
-        showStatus("This doesn't look like a Jupyter notebook (no cells found).", "error");
-        return;
+        errors.push(`${file.name}: doesn't look like a notebook (no cells)`);
+        continue;
       }
 
-      currentBaseName = file.name.replace(/\.ipynb$/i, "");
-      fileNameEl.textContent = file.name;
+      const baseName = uniqueBaseName(file.name.replace(/\.ipynb$/i, ""));
+      loadedFiles.push({
+        id: nextId++,
+        fileName: file.name,
+        baseName,
+        notebook,
+      });
+    }
 
-      try {
-        renderNotebook(notebook, currentBaseName);
-      } catch (e) {
-        console.error(e);
-        showStatus("Something went wrong rendering this notebook: " + e.message, "error");
-        return;
-      }
+    updateUiForFiles();
 
+    if (errors.length) {
+      showStatus(`Skipped ${errors.length} file(s): ${errors.join("; ")}`, "error");
+    } else {
       hideStatus();
-      toolbar.classList.remove("hidden");
-      previewEl.classList.remove("hidden");
-      dropzone.classList.add("hidden");
-    };
-    reader.onerror = () => showStatus("Could not read that file.", "error");
-    reader.readAsText(file);
+    }
   }
 
   dropzone.addEventListener("click", () => fileInput.click());
-  fileInput.addEventListener("change", (e) => handleFile(e.target.files[0]));
+  addMoreBtn.addEventListener("click", () => fileInput.click());
+
+  fileInput.addEventListener("change", (e) => {
+    handleFiles(e.target.files);
+    fileInput.value = "";
+  });
 
   ["dragenter", "dragover"].forEach((evt) =>
     dropzone.addEventListener(evt, (e) => {
@@ -252,47 +333,83 @@
     })
   );
   dropzone.addEventListener("drop", (e) => {
-    const file = e.dataTransfer.files[0];
-    handleFile(file);
+    handleFiles(e.dataTransfer.files);
   });
 
   resetBtn.addEventListener("click", () => {
-    toolbar.classList.add("hidden");
-    previewEl.classList.add("hidden");
-    dropzone.classList.remove("hidden");
-    notebookRoot.innerHTML = "";
+    loadedFiles = [];
+    updateUiForFiles();
     fileInput.value = "";
     hideStatus();
   });
 
-  downloadBtn.addEventListener("click", () => {
+  function sanitizeZipEntryName(name) {
+    return name.replace(/[\\/:*?"<>|]/g, "_");
+  }
+
+  downloadBtn.addEventListener("click", async () => {
+    if (loadedFiles.length === 0) return;
+
     downloadBtn.disabled = true;
-    downloadBtn.textContent = "Generating PDF…";
-    showStatus("Rendering PDF — this can take a few seconds for long notebooks…", "info");
+    addMoreBtn.disabled = true;
+    resetBtn.disabled = true;
+    const originalLabel = downloadBtn.textContent;
 
     const opt = {
       margin: [10, 10],
-      filename: `${currentBaseName}.pdf`,
       image: { type: "jpeg", quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, logging: false },
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
       pagebreak: { mode: ["css", "legacy"] },
     };
 
-    html2pdf()
-      .set(opt)
-      .from(notebookRoot)
-      .save()
-      .then(() => {
+    try {
+      const total = loadedFiles.length;
+
+      if (total === 1) {
+        const entry = loadedFiles[0];
+        showStatus(`Rendering PDF for ${entry.fileName}…`, "info");
+        downloadBtn.textContent = "Generating PDF…";
+        const el = notebookRoot.querySelector(`[data-file-id="${entry.id}"]`);
+        await html2pdf().set({ ...opt, filename: `${entry.baseName}.pdf` }).from(el).save();
         hideStatus();
-      })
-      .catch((err) => {
-        console.error(err);
-        showStatus("PDF generation failed: " + err.message, "error");
-      })
-      .finally(() => {
-        downloadBtn.disabled = false;
-        downloadBtn.textContent = "Download PDF";
-      });
+        return;
+      }
+
+      const zip = new JSZip();
+
+      for (let i = 0; i < total; i++) {
+        const entry = loadedFiles[i];
+        downloadBtn.textContent = `Converting ${i + 1} of ${total}…`;
+        showStatus(`Converting ${i + 1} of ${total}: ${entry.fileName}`, "info");
+
+        const el = notebookRoot.querySelector(`[data-file-id="${entry.id}"]`);
+        const pdfBlob = await html2pdf().set(opt).from(el).outputPdf("blob");
+        zip.file(`${sanitizeZipEntryName(entry.baseName)}.pdf`, pdfBlob);
+      }
+
+      showStatus("Packaging PDFs into a ZIP…", "info");
+      downloadBtn.textContent = "Packaging ZIP…";
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "notebooks-pdf.zip";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      hideStatus();
+    } catch (err) {
+      console.error(err);
+      showStatus("PDF conversion failed: " + err.message, "error");
+    } finally {
+      downloadBtn.disabled = false;
+      addMoreBtn.disabled = false;
+      resetBtn.disabled = false;
+      downloadBtn.textContent = originalLabel;
+    }
   });
 })();

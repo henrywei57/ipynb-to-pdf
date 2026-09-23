@@ -122,6 +122,49 @@ body {
 
 .btn-secondary:hover { background: #f0f1f3; }
 
+.file-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.file-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+}
+
+.file-list .file-list-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-list .file-remove {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.file-list .file-remove:hover {
+  background: #fdecea;
+  color: #a12622;
+}
+
 .status {
   margin-top: 16px;
   padding: 10px 14px;
@@ -249,6 +292,18 @@ body {
   font-weight: 700;
   margin-bottom: 16px;
   word-break: break-all;
+}
+
+.nb-doc {
+  padding-bottom: 28px;
+  margin-bottom: 28px;
+  border-bottom: 2px dashed var(--border);
+}
+
+.nb-doc:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 
 @media (max-width: 600px) {

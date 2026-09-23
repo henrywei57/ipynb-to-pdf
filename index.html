@@ -16,26 +16,29 @@
     </header>
 
     <div id="dropzone" class="dropzone">
-      <input type="file" id="fileInput" accept=".ipynb" hidden />
+      <input type="file" id="fileInput" accept=".ipynb" multiple hidden />
       <div class="dropzone-content">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke-linecap="round" stroke-linejoin="round"/>
           <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <p><strong>Drop a .ipynb file here</strong> or click to browse</p>
-        <p class="hint">Your file stays on this device — nothing is sent to a server.</p>
+        <p><strong>Drop one or more .ipynb files here</strong> or click to browse</p>
+        <p class="hint">Your files stay on this device — nothing is sent to a server.</p>
       </div>
     </div>
 
     <div id="toolbar" class="toolbar hidden">
       <div class="file-info">
-        <span id="fileName"></span>
+        <span id="fileCount"></span>
       </div>
       <div class="toolbar-actions">
-        <button id="downloadPdfBtn" class="btn btn-primary">Download PDF</button>
-        <button id="resetBtn" class="btn btn-secondary">Choose another file</button>
+        <button id="addMoreBtn" class="btn btn-secondary">Add more files</button>
+        <button id="resetBtn" class="btn btn-secondary">Clear all</button>
+        <button id="downloadPdfBtn" class="btn btn-primary">Convert &amp; Download All</button>
       </div>
     </div>
+
+    <ul id="fileList" class="file-list hidden"></ul>
 
     <div id="status" class="status hidden"></div>
 
@@ -51,6 +54,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
